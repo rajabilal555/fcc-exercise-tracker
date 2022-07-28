@@ -82,10 +82,13 @@ app.get("/api/users/:_id/logs", async function (req, res) {
 		if (user) {
 			let searchQuery = {};
 			if (req.query.from) {
-				searchQuery.date = { $gte: req.query.from };
+				searchQuery.date = {
+					...searchQuery.date,
+					$gte: req.query.from,
+				};
 			}
 			if (req.query.to) {
-				searchQuery.date = { $lte: req.query.to };
+				searchQuery.date = { ...searchQuery.date, $lte: req.query.to };
 			}
 
 			//[from][&to][&limit]
