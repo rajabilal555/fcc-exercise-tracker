@@ -6,6 +6,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 let User = require("./models/user");
 let Exercise = require("./models/exercise");
+let helpers = require("./misc/helpers");
 
 mongoose.connect(process.env.MONGO_URL, {
 	useNewUrlParser: true,
@@ -45,18 +46,66 @@ app.post("/api/users", async function (req, res) {
 });
 app.post("/api/users/:_id/exercises", async function (req, res) {
 	try {
-		User.find({ _id: req.params._id });
+		User.findOne({ _id: req.params._id }, function (err, user) {
+			if (user) {
+				let date = helpers.formatDate(new Date(), "yyy-mm-dd");
+				if (req.body.date) {
+					date = req.body.date;
+				}
+				const exercise = new Exercise({
+					username: user.username,
+					description: req.body.description,
+					duration: req.body.duration,
+					date: date,
+				});
+				exercise.save();
 
-		Exercise.find({ username: req.params.id }, function (err, users) {
-			res.json(users);
+				res.json({
+					_id: user._id,
+					username: user.username,
+					description: exercise.description,
+					duration: exercise.duration,
+					date: exercise.date,
+				});
+			} else {
+				res.status(400).json({ error: "Invalid user" });
+			}
 		});
 	} catch (err) {
-		res.status(400).json([err]);
+		res.status(400).json(err);
 	}
 });
 app.get("/api/users/:_id/logs", async function (req, res) {
-	//[from][&to][&limit]
 	console.log(req.query);
+	User.findOne({ _id: req.params._id }, function (err, user) {
+		console.log(user);
+		if (user) {
+			let searchQuery = {};
+			if (req.query.from) {
+				searchQuery.date = { $gte: req.query.from };
+			}
+			if (req.query.to) {
+				searchQuery.date = { $lte: req.query.to };
+			}
+
+			//[from][&to][&limit]
+			Exercise.find(
+				{ username: user.username, ...searchQuery },
+				"description duration date"
+			)
+				.limit(req.query.limit || 10)
+				.exec(function (err, exercises) {
+					res.json({
+						_id: user._id,
+						username: user.username,
+						count: exercises.length,
+						log: exercises.map((val) => val.toJSON()),
+					});
+				});
+		} else {
+			res.status(400).json({ error: "Invalid user" });
+		}
+	});
 });
 
 const listener = app.listen(process.env.PORT || 3000, () => {
